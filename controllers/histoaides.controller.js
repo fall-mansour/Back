@@ -1,6 +1,5 @@
 const db = require('../db'); // connexion MySQL
-const fs = require('fs');
-const path = require('path');
+const cloudinary = require('../cloudinary'); // fichier cloudinary.js à la racine du backend
 
 // 🔹 Récupérer l’historique des dons d’un utilisateur
 exports.getHistoaides = async (req, res) => {
@@ -27,19 +26,30 @@ exports.getHistoaides = async (req, res) => {
   }
 };
 
-// 🔹 Supprimer un don par ID
+// 🔹 Supprimer un don par ID (Cloudinary)
 exports.supprimerAide = async (req, res) => {
   try {
     const aideId = parseInt(req.params.id, 10);
     if (isNaN(aideId)) return res.status(400).json({ message: 'ID invalide' });
 
-    // Supprimer l'image si elle existe
+    // Récupérer l'URL Cloudinary de l'image
     const [rows] = await db.execute('SELECT image FROM objetsaides WHERE id = ?', [aideId]);
     if (rows.length && rows[0].image) {
-      const imagePath = path.join(__dirname, '../uploads', rows[0].image);
-      if (fs.existsSync(imagePath)) fs.unlinkSync(imagePath);
+      const imageUrl = rows[0].image;
+
+      // Extraire le public_id à partir de l'URL Cloudinary
+      const publicIdMatch = imageUrl.match(/\/([^\/]+)\.(jpg|jpeg|png|gif|webp|bmp|svg)$/);
+      if (publicIdMatch) {
+        const publicId = 'secondlife_uploads/' + publicIdMatch[1];
+        try {
+          await cloudinary.uploader.destroy(publicId);
+        } catch (err) {
+          console.error('Erreur suppression image Cloudinary:', err);
+        }
+      }
     }
 
+    // Supprimer l'objet de la base
     await db.execute('DELETE FROM objetsaides WHERE id = ?', [aideId]);
     res.status(200).json({ message: 'Don retiré avec succès' });
   } catch (err) {
