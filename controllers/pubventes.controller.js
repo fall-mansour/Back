@@ -10,7 +10,7 @@ const upload = multer({ dest: 'tmp/' }).fields([
   { name: 'image2', maxCount: 1 }
 ]);
 
-// ➕ Ajouter un objet à vendre avec Cloudinary
+// ➕ Ajouter un objet à vendre
 exports.addObjetVente = (req, res) => {
   upload(req, res, async (err) => {
     if (err) {
@@ -39,18 +39,12 @@ exports.addObjetVente = (req, res) => {
 
       // Insertion en base
       const sql = `
-        INSERT INTO objetsventes (description, quantite, prix, categorie, utilisateur_id, image, image1, image2)
+        INSERT INTO objetsventes
+        (description, quantite, prix, categorie, utilisateur_id, image, image1, image2)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `;
       const [result] = await db.execute(sql, [
-        description,
-        quantite,
-        prix,
-        categorie,
-        utilisateur_id,
-        image,
-        image1,
-        image2
+        description, quantite, prix, categorie, utilisateur_id, image, image1, image2
       ]);
 
       res.status(201).json({ message: 'Objet ajouté avec succès', id: result.insertId, image });
@@ -60,4 +54,38 @@ exports.addObjetVente = (req, res) => {
       res.status(500).json({ message: 'Erreur serveur lors de l’ajout de l’objet' });
     }
   });
+};
+
+// 🔹 Récupérer tous les objets en vente
+exports.getVentes = async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT * FROM objetsventes');
+    res.json(rows);
+  } catch (error) {
+    console.error('Erreur getVentes :', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+};
+
+// 🔹 Récupérer toutes les catégories
+exports.getCategories = async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT DISTINCT categorie FROM objetsventes');
+    res.json(rows);
+  } catch (error) {
+    console.error('Erreur getCategories :', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
+};
+
+// 🔹 Supprimer un objet à vendre
+exports.deleteObjetVente = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.execute('DELETE FROM objetsventes WHERE id = ?', [id]);
+    res.json({ message: 'Objet supprimé' });
+  } catch (error) {
+    console.error('Erreur deleteObjetVente :', error);
+    res.status(500).json({ message: 'Erreur serveur' });
+  }
 };
