@@ -1,7 +1,7 @@
 const db = require('../db');
 const multer = require('multer');
 const fs = require('fs');
-const cloudinary = require('../cloudinary'); // fichier cloudinary.js à la racine du backend
+const cloudinary = require('../cloudinary');
 
 // Multer : stockage temporaire
 const upload = multer({ dest: 'tmp/' }).fields([
@@ -25,7 +25,6 @@ exports.addObjetAide = (req, res) => {
         return res.status(400).json({ message: 'Tous les champs obligatoires doivent être remplis (image principale incluse)' });
       }
 
-      // Fonction pour uploader sur Cloudinary et supprimer le fichier temporaire
       const uploadToCloudinary = async (file) => {
         const result = await cloudinary.uploader.upload(file.path, { folder: 'secondlife_uploads' });
         fs.unlinkSync(file.path);
@@ -36,7 +35,6 @@ exports.addObjetAide = (req, res) => {
       const image1 = req.files['image1'] ? await uploadToCloudinary(req.files['image1'][0]) : null;
       const image2 = req.files['image2'] ? await uploadToCloudinary(req.files['image2'][0]) : null;
 
-      // Insertion en base
       const sql = `
         INSERT INTO objetsaides
         (description, quantite, categorie, utilisateur_id, image, image1, image2)
@@ -56,5 +54,36 @@ exports.addObjetAide = (req, res) => {
   });
 };
 
-// === Les autres fonctions restent inchangées ===
-// getAides, getCategories, deleteObjetAide
+// 🟩 Récupérer tous les objets d’aide
+exports.getAides = async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT * FROM objetsaides ORDER BY id DESC');
+    res.json(rows);
+  } catch (error) {
+    console.error('Erreur getAides :', error);
+    res.status(500).json({ message: 'Erreur serveur lors du chargement des aides' });
+  }
+};
+
+// 🟩 Récupérer les catégories
+exports.getCategories = async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT DISTINCT categorie FROM objetsaides');
+    res.json(rows);
+  } catch (error) {
+    console.error('Erreur getCategories :', error);
+    res.status(500).json({ message: 'Erreur lors du chargement des catégories' });
+  }
+};
+
+// 🟥 Supprimer un objet d’aide
+exports.deleteObjetAide = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.execute('DELETE FROM objetsaides WHERE id = ?', [id]);
+    res.json({ message: 'Objet supprimé avec succès' });
+  } catch (error) {
+    console.error('Erreur deleteObjetAide :', error);
+    res.status(500).json({ message: 'Erreur lors de la suppression' });
+  }
+};
