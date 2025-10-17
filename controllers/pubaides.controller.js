@@ -1,14 +1,28 @@
 const db = require('../db');
 const multer = require('multer');
-const fs = require('fs');
 const cloudinary = require('../cloudinary');
 
-// Multer : stockage temporaire
-const upload = multer({ dest: 'tmp/' }).fields([
+// Multer en mémoire
+const storage = multer.memoryStorage();
+const upload = multer({ storage }).fields([
   { name: 'image', maxCount: 1 },
   { name: 'image1', maxCount: 1 },
-  { name: 'image2', maxCount: 1 },
+  { name: 'image2', maxCount: 1 }
 ]);
+
+// Fonction pour uploader un buffer sur Cloudinary
+const uploadToCloudinary = (fileBuffer) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'secondlife_uploads' },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    stream.end(fileBuffer);
+  });
+};
 
 // ➕ Ajouter un objet d’aide
 exports.addObjetAide = (req, res) => {
@@ -25,15 +39,9 @@ exports.addObjetAide = (req, res) => {
         return res.status(400).json({ message: 'Tous les champs obligatoires doivent être remplis (image principale incluse)' });
       }
 
-      const uploadToCloudinary = async (file) => {
-        const result = await cloudinary.uploader.upload(file.path, { folder: 'secondlife_uploads' });
-        fs.unlinkSync(file.path);
-        return result.secure_url;
-      };
-
-      const image = await uploadToCloudinary(req.files['image'][0]);
-      const image1 = req.files['image1'] ? await uploadToCloudinary(req.files['image1'][0]) : null;
-      const image2 = req.files['image2'] ? await uploadToCloudinary(req.files['image2'][0]) : null;
+      const image = await uploadToCloudinary(req.files['image'][0].buffer);
+      const image1 = req.files['image1'] ? await uploadToCloudinary(req.files['image1'][0].buffer) : null;
+      const image2 = req.files['image2'] ? await uploadToCloudinary(req.files['image2'][0].buffer) : null;
 
       const sql = `
         INSERT INTO objetsaides
@@ -44,46 +52,11 @@ exports.addObjetAide = (req, res) => {
         description, quantite, categorie, utilisateur_id, image, image1, image2
       ]);
 
-      console.log('✅ Objet ajouté avec ID :', result.insertId);
       res.status(201).json({ message: 'Objet d’aide ajouté avec succès', id: result.insertId, image });
 
     } catch (error) {
-      console.error('❌ Erreur Cloudinary / addObjetAide :', error);
+      console.error('Erreur Cloudinary / addObjetAide :', error);
       res.status(500).json({ message: 'Erreur serveur lors de l’ajout' });
     }
   });
-};
-
-// 🟩 Récupérer tous les objets d’aide
-exports.getAides = async (req, res) => {
-  try {
-    const [rows] = await db.execute('SELECT * FROM objetsaides ORDER BY id DESC');
-    res.json(rows);
-  } catch (error) {
-    console.error('Erreur getAides :', error);
-    res.status(500).json({ message: 'Erreur serveur lors du chargement des aides' });
-  }
-};
-
-// 🟩 Récupérer les catégories
-exports.getCategories = async (req, res) => {
-  try {
-    const [rows] = await db.execute('SELECT DISTINCT categorie FROM objetsaides');
-    res.json(rows);
-  } catch (error) {
-    console.error('Erreur getCategories :', error);
-    res.status(500).json({ message: 'Erreur lors du chargement des catégories' });
-  }
-};
-
-// 🟥 Supprimer un objet d’aide
-exports.deleteObjetAide = async (req, res) => {
-  try {
-    const { id } = req.params;
-    await db.execute('DELETE FROM objetsaides WHERE id = ?', [id]);
-    res.json({ message: 'Objet supprimé avec succès' });
-  } catch (error) {
-    console.error('Erreur deleteObjetAide :', error);
-    res.status(500).json({ message: 'Erreur lors de la suppression' });
-  }
 };
