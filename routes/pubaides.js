@@ -1,18 +1,13 @@
-// routes/pubaides.js
 const express = require('express');
 const router = express.Router();
 const pubaidesCtrl = require('../controllers/pubaides.controller');
 
-// 🔹 Récupérer toutes les aides (optionnel : filtrage par catégorie)
-router.get('/', pubaidesCtrl.getAides);
+router.get('/', pubaidesCtrl.getAides);           // OK
+router.get('/categories', pubaidesCtrl.getCategories); // OK
 
-// 🔹 Récupérer toutes les catégories
-router.get('/categories', pubaidesCtrl.getCategories);
-
-// 🔹 Ajouter un objet d’aide avec upload Cloudinary
+// POST → uniquement le controller, l’upload est géré à l’intérieur
 router.post('/', pubaidesCtrl.addObjetAide);
 
-// 🔹 Supprimer un objet d’aide par ID
 router.delete('/:id', pubaidesCtrl.deleteObjetAide);
 
 module.exports = router;
