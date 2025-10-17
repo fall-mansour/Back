@@ -2,10 +2,9 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/pubventes.controller');
 
-// Récupérer tous les objets en vente
 router.get('/', controller.getVentes);
-
-// Récupérer toutes les catégories
 router.get('/categories', controller.getCategories);
+router.post('/', controller.addObjetVente);
+router.delete('/:id', controller.deleteObjetVente);
 
 module.exports = router;
