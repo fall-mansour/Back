@@ -1,22 +1,31 @@
-const db = require('../db'); // ta config MySQL
+const db = require('../db');
 const multer = require('multer');
-const fs = require('fs');
-const cloudinary = require('../cloudinary'); // import du fichier Cloudinary à la racine du backend
+const cloudinary = require('../cloudinary');
 
-// 🔹 Multer : stockage temporaire en mémoire
-const upload = multer({ dest: 'tmp/' }).fields([
+// Multer en mémoire
+const storage = multer.memoryStorage();
+const upload = multer({ storage }).fields([
   { name: 'image', maxCount: 1 },
   { name: 'image1', maxCount: 1 },
   { name: 'image2', maxCount: 1 }
 ]);
 
-// ➕ Ajouter une vente
-exports.ajoutVente = (req, res) => {
+const uploadToCloudinary = (fileBuffer) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'secondlife_uploads' },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    stream.end(fileBuffer);
+  });
+};
+
+exports.addObjetVente = (req, res) => {
   upload(req, res, async (err) => {
-    if (err) {
-      console.error('Erreur multer :', err);
-      return res.status(500).json({ message: 'Erreur lors de l’upload des images' });
-    }
+    if (err) return res.status(500).json({ message: 'Erreur lors de l’upload des images' });
 
     try {
       const { description, quantite, prix, categorie, utilisateur_id } = req.body;
@@ -25,34 +34,22 @@ exports.ajoutVente = (req, res) => {
         return res.status(400).json({ message: 'Tous les champs obligatoires doivent être remplis (image principale incluse)' });
       }
 
-      // 🔹 Fonction pour uploader sur Cloudinary et supprimer le fichier temporaire
-      const uploadToCloudinary = async (file) => {
-        const result = await cloudinary.uploader.upload(file.path, { folder: 'secondlife_uploads' });
-        fs.unlinkSync(file.path); // supprimer le fichier temporaire
-        return result.secure_url;
-      };
+      const image = await uploadToCloudinary(req.files['image'][0].buffer);
+      const image1 = req.files['image1'] ? await uploadToCloudinary(req.files['image1'][0].buffer) : null;
+      const image2 = req.files['image2'] ? await uploadToCloudinary(req.files['image2'][0].buffer) : null;
 
-      // 🔹 Upload des images
-      const image = await uploadToCloudinary(req.files['image'][0]);
-      const image1 = req.files['image1'] ? await uploadToCloudinary(req.files['image1'][0]) : null;
-      const image2 = req.files['image2'] ? await uploadToCloudinary(req.files['image2'][0]) : null;
-
-      // 🔹 Insertion en base
-      const sql = `INSERT INTO objetsventes
+      const sql = `
+        INSERT INTO objetsventes
         (description, quantite, prix, categorie, utilisateur_id, image, image1, image2)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      const [result] = await db.execute(sql, [description, quantite, prix, categorie, utilisateur_id, image, image1, image2]);
 
-      db.query(sql, [description, quantite, prix, categorie, utilisateur_id, image, image1, image2], (err, result) => {
-        if (err) {
-          console.error('Erreur MySQL :', err);
-          return res.status(500).json({ message: 'Erreur lors de l’insertion en base de données' });
-        }
-        return res.json({ message: 'Vente ajoutée avec succès', id: result.insertId });
-      });
+      res.status(201).json({ message: 'Objet ajouté avec succès', id: result.insertId, image });
 
     } catch (error) {
-      console.error('Erreur Cloudinary :', error);
-      return res.status(500).json({ message: 'Erreur lors de l’upload sur Cloudinary' });
+      console.error('Erreur Cloudinary / addObjetVente :', error);
+      res.status(500).json({ message: 'Erreur serveur lors de l’ajout de l’objet' });
     }
   });
 };
