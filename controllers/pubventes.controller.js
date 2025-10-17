@@ -1,14 +1,28 @@
-const db = require('../db'); // connexion MySQL
+const db = require('../db');
 const multer = require('multer');
-const fs = require('fs');
-const cloudinary = require('../cloudinary'); // fichier cloudinary.js à la racine du backend
+const cloudinary = require('../cloudinary');
 
-// Multer : stockage temporaire
-const upload = multer({ dest: 'tmp/' }).fields([
+// Multer en mémoire
+const storage = multer.memoryStorage();
+const upload = multer({ storage }).fields([
   { name: 'image', maxCount: 1 },
   { name: 'image1', maxCount: 1 },
   { name: 'image2', maxCount: 1 }
 ]);
+
+// Fonction pour uploader sur Cloudinary à partir d'un buffer
+const uploadToCloudinary = (fileBuffer) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'secondlife_uploads' },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    stream.end(fileBuffer);
+  });
+};
 
 // ➕ Ajouter un objet à vendre
 exports.addObjetVente = (req, res) => {
@@ -25,17 +39,10 @@ exports.addObjetVente = (req, res) => {
         return res.status(400).json({ message: 'Tous les champs obligatoires doivent être remplis (image principale incluse)' });
       }
 
-      // Fonction pour uploader sur Cloudinary et supprimer le fichier temporaire
-      const uploadToCloudinary = async (file) => {
-        const result = await cloudinary.uploader.upload(file.path, { folder: 'secondlife_uploads' });
-        fs.unlinkSync(file.path);
-        return result.secure_url;
-      };
-
-      // Upload des images
-      const image = await uploadToCloudinary(req.files['image'][0]);
-      const image1 = req.files['image1'] ? await uploadToCloudinary(req.files['image1'][0]) : null;
-      const image2 = req.files['image2'] ? await uploadToCloudinary(req.files['image2'][0]) : null;
+      // Upload des images sur Cloudinary
+      const image = await uploadToCloudinary(req.files['image'][0].buffer);
+      const image1 = req.files['image1'] ? await uploadToCloudinary(req.files['image1'][0].buffer) : null;
+      const image2 = req.files['image2'] ? await uploadToCloudinary(req.files['image2'][0].buffer) : null;
 
       // Insertion en base
       const sql = `
