@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const pubaidesCtrl = require('../controllers/pubaides.controller');
+const controller = require('../controllers/pubaides.controller');
 
-router.get('/', pubaidesCtrl.getAides);           // OK
-router.get('/categories', pubaidesCtrl.getCategories); // OK
+// === Routes pour les objets d’aide ===
 
-// POST → uniquement le controller, l’upload est géré à l’intérieur
-router.post('/', pubaidesCtrl.addObjetAide);
+// POST : ajouter un objet d’aide
+router.post('/ajout-aide', controller.addObjetAide);
 
-router.delete('/:id', pubaidesCtrl.deleteObjetAide);
+// GET : afficher tous les objets d’aide
+router.get('/liste', controller.afficherObjetsAides);
 
 module.exports = router;
